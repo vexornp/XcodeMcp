@@ -1,0 +1,11 @@
+Targets:
+  App
+  AppTests
+
+Build Configurations:
+  Debug
+  Release
+
+Schemes:
+  App
+  AppTests

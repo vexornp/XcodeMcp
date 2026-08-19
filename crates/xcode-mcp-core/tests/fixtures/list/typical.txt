@@ -1,0 +1,13 @@
+Schemes:
+  App
+  AppTests
+
+Targets:
+  App
+  AppTests
+
+Build Configurations:
+  Debug
+  Release
+
+If no build configuration is specified, Production is used.

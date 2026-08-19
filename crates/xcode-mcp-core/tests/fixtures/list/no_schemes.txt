@@ -1,0 +1,8 @@
+Schemes:
+
+Targets:
+  App
+
+Build Configurations:
+  Debug
+  Release

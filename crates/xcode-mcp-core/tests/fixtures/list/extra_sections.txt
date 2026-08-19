@@ -1,0 +1,12 @@
+Schemes:
+  App
+
+Targets:
+  App
+
+Build Configurations:
+  Debug
+  Release
+
+Swift Packages:
+  SomePackage

@@ -1,5 +1,6 @@
 pub mod diagnostic;
 pub mod error;
+pub mod scheme;
 pub mod security;
 
 pub use diagnostic::{Diagnostic, DiagnosticSource, FixIt, FixItRange, ParseResult, Severity};
