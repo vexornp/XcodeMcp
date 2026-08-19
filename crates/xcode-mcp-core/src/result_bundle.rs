@@ -10,9 +10,9 @@ pub fn parse_build_results(json: &str) -> Result<ParseResult> {
     let mut parse_warnings = Vec::new();
     let mut recognized = false;
 
-    if root.get("actions").and_then(|a| a.as_array()).is_some() {
+    if let Some(actions) = root.get("actions").and_then(|a| a.as_array()) {
         recognized = true;
-        for action in root["actions"].as_array().unwrap() {
+        for action in actions {
             if let Some(issues) = action
                 .get("_results")
                 .and_then(|r| r.get("issues"))

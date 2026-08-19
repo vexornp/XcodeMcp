@@ -24,7 +24,9 @@ tempfile.workspace = true
 [[test]]
 name = "build"
 path = "tests/live/build.rs"
+required-features = ["live-xcode"]
 
 [[test]]
 name = "errors"
 path = "tests/live/errors.rs"
+required-features = ["live-xcode"]
