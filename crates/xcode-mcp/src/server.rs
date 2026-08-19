@@ -216,8 +216,10 @@ impl XcodeMcpServer {
             "xcode_list_schemes" => {
                 let project = arguments
                     .get("project_or_workspace")
-                    .and_then(|p| p.as_str())
-                    .ok_or_else(|| jsonrpc_error(-32602, "project_or_workspace required"))?;
+                    .and_then(|p| p.as_str());
+                let Some(project) = project else {
+                    return Err(jsonrpc_error(-32602, "project_or_workspace required"));
+                };
                 list_schemes(project, &self.root)
                     .await
                     .map(|info| serde_json::to_value(&info).unwrap_or(Value::Null))
@@ -226,12 +228,14 @@ impl XcodeMcpServer {
             "xcode_build" => {
                 let project = arguments
                     .get("project_or_workspace")
-                    .and_then(|p| p.as_str())
-                    .ok_or_else(|| jsonrpc_error(-32602, "project_or_workspace required"))?;
-                let scheme = arguments
-                    .get("scheme")
-                    .and_then(|s| s.as_str())
-                    .ok_or_else(|| jsonrpc_error(-32602, "scheme required"))?;
+                    .and_then(|p| p.as_str());
+                let Some(project) = project else {
+                    return Err(jsonrpc_error(-32602, "project_or_workspace required"));
+                };
+                let scheme = arguments.get("scheme").and_then(|s| s.as_str());
+                let Some(scheme) = scheme else {
+                    return Err(jsonrpc_error(-32602, "scheme required"));
+                };
                 let build_params = BuildParams {
                     project_or_workspace: project.to_string(),
                     scheme: scheme.to_string(),

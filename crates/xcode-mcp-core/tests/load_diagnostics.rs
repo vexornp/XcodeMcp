@@ -56,3 +56,15 @@ async fn errors_when_build_not_found() {
             .is_err()
     );
 }
+
+#[tokio::test]
+async fn rejects_path_traversal_in_build_id() {
+    let dir = tempdir().unwrap();
+    let result_dir = dir.path().join("results");
+    let log_dir = dir.path().join("logs");
+    fs::create_dir_all(&result_dir).unwrap();
+    fs::create_dir_all(&log_dir).unwrap();
+    let store = BuildStore::new(32);
+    let result = load_diagnostics(Some("../../etc/passwd"), &store, &result_dir, &log_dir).await;
+    assert!(result.is_err());
+}

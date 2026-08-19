@@ -38,6 +38,7 @@ pub struct BuildStore {
 
 impl BuildStore {
     pub fn new(cap: usize) -> Self {
+        let cap = cap.max(1);
         Self {
             records: Mutex::new(VecDeque::with_capacity(cap)),
             cap,

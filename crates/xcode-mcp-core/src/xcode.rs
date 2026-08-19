@@ -188,6 +188,7 @@ pub async fn run_supervised(
                 .is_err()
             {
                 kill_process_group(pid, libc::SIGKILL);
+                let _ = child.start_kill();
                 let _ = child.wait().await;
             }
             let _ = stdout_task.await;
@@ -314,29 +315,15 @@ pub async fn run_build(
         }
     }
 
-    // 10. Register in store
+    // 10. Determine build status
     let build_status = match status.as_str() {
         "Succeeded" => BuildStatus::Succeeded,
         "TimedOut" => BuildStatus::TimedOut,
         _ => BuildStatus::Failed,
     };
-    store.push(BuildRecord {
-        build_id: build_id.clone(),
-        status: build_status.clone(),
-        exit_code,
-        duration_secs: duration,
-        project_or_workspace: validated_path.clone(),
-        scheme: scheme.clone(),
-        xcresult_path: xcresult_path.clone(),
-        log_path: log_path.clone(),
-        result_bundle_written,
-        error_count: 0,
-        warning_count: 0,
-        stderr_excerpt: truncated_stderr_excerpt.clone(),
-        created_at: std::time::SystemTime::now(),
-    });
 
-    // 11. Best-effort: compute error/warning counts
+    // 11. Best-effort: compute error/warning counts (before storing so
+    //     load_diagnostics uses the filesystem fallback, not a stale record)
     let (error_count, warning_count) = if result_bundle_written {
         match load_diagnostics(Some(&build_id), store, result_dir, log_dir).await {
             Ok(o) => (o.merged.errors.len() as u32, o.merged.warnings.len() as u32),
@@ -348,6 +335,23 @@ pub async fn run_build(
     } else {
         (0, 0)
     };
+
+    // 12. Register in store with computed counts
+    store.push(BuildRecord {
+        build_id: build_id.clone(),
+        status: build_status.clone(),
+        exit_code,
+        duration_secs: duration,
+        project_or_workspace: validated_path.clone(),
+        scheme: scheme.clone(),
+        xcresult_path: xcresult_path.clone(),
+        log_path: log_path.clone(),
+        result_bundle_written,
+        error_count,
+        warning_count,
+        stderr_excerpt: truncated_stderr_excerpt.clone(),
+        created_at: std::time::SystemTime::now(),
+    });
 
     Ok(BuildOutput {
         build_id,

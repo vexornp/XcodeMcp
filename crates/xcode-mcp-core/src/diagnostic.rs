@@ -242,31 +242,34 @@ pub async fn load_diagnostics(
     log_dir: &Path,
 ) -> Result<DiagnosticOutput> {
     let record = match build_id {
-        Some(id) => store
-            .get(id)
-            .or_else(|| {
-                let xcresult_path = result_dir.join(format!("{id}.xcresult"));
-                if xcresult_path.exists() {
-                    Some(BuildRecord {
-                        build_id: id.to_string(),
-                        status: BuildStatus::Unknown,
-                        exit_code: None,
-                        duration_secs: 0.0,
-                        project_or_workspace: Path::new("").into(),
-                        scheme: String::new(),
-                        xcresult_path,
-                        log_path: log_dir.join(format!("{id}.log")),
-                        result_bundle_written: true,
-                        error_count: 0,
-                        warning_count: 0,
-                        stderr_excerpt: None,
-                        created_at: std::time::SystemTime::now(),
-                    })
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| Error::BuildNotFound(id.to_string()))?,
+        Some(id) => {
+            let id = crate::security::validate_build_id(id)?;
+            store
+                .get(&id)
+                .or_else(|| {
+                    let xcresult_path = result_dir.join(format!("{id}.xcresult"));
+                    if xcresult_path.exists() {
+                        Some(BuildRecord {
+                            build_id: id.clone(),
+                            status: BuildStatus::Unknown,
+                            exit_code: None,
+                            duration_secs: 0.0,
+                            project_or_workspace: Path::new("").into(),
+                            scheme: String::new(),
+                            xcresult_path,
+                            log_path: log_dir.join(format!("{id}.log")),
+                            result_bundle_written: true,
+                            error_count: 0,
+                            warning_count: 0,
+                            stderr_excerpt: None,
+                            created_at: std::time::SystemTime::now(),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .ok_or(Error::BuildNotFound(id))?
+        }
         None => store.most_recent().ok_or_else(|| Error::NoBuildAvailable {
             hint: "no builds in session".into(),
         })?,
@@ -300,7 +303,8 @@ pub async fn load_diagnostics(
     let had_stderr = stderr_result.is_some();
     let xcresult = xcresult_result.unwrap_or_default();
     let stderr = stderr_result.unwrap_or_default();
-    let merged = merge_diagnostics(xcresult, stderr);
+    let mut merged = merge_diagnostics(xcresult, stderr);
+    merged.parse_warnings.extend(parse_warnings);
 
     let source = if record.result_bundle_written && record.xcresult_path.exists() && had_xcresult {
         DiagnosticSourceLabel::Xcresult
