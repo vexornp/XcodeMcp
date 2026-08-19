@@ -1,0 +1,17 @@
+[package]
+name = "xcode-mcp"
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+xcode-mcp-core = { path = "../xcode-mcp-core" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+# Added back in Task 15 (MCP server); not available on mirror yet:
+# rmcp.workspace = true
+# tracing.workspace = true
+# tracing-subscriber.workspace = true
