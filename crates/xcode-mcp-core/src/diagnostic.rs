@@ -1,4 +1,8 @@
+use crate::error::{Error, Result};
+use crate::result_bundle::read_build_results;
+use crate::store::{BuildRecord, BuildStatus, BuildStore};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -213,4 +217,103 @@ pub fn merge_diagnostics(xcresult: ParseResult, stderr: ParseResult) -> MergedDi
 
 fn normalize_message(msg: &str) -> String {
     msg.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticSourceLabel {
+    Xcresult,
+    StderrOnly,
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnosticOutput {
+    pub build_id: String,
+    pub build_status: BuildStatus,
+    pub source: DiagnosticSourceLabel,
+    pub merged: MergedDiagnostics,
+}
+
+pub async fn load_diagnostics(
+    build_id: Option<&str>,
+    store: &BuildStore,
+    result_dir: &Path,
+    log_dir: &Path,
+) -> Result<DiagnosticOutput> {
+    let record = match build_id {
+        Some(id) => store
+            .get(id)
+            .or_else(|| {
+                let xcresult_path = result_dir.join(format!("{id}.xcresult"));
+                if xcresult_path.exists() {
+                    Some(BuildRecord {
+                        build_id: id.to_string(),
+                        status: BuildStatus::Unknown,
+                        exit_code: None,
+                        duration_secs: 0.0,
+                        project_or_workspace: Path::new("").into(),
+                        scheme: String::new(),
+                        xcresult_path,
+                        log_path: log_dir.join(format!("{id}.log")),
+                        result_bundle_written: true,
+                        error_count: 0,
+                        warning_count: 0,
+                        stderr_excerpt: None,
+                        created_at: std::time::SystemTime::now(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| Error::BuildNotFound(id.to_string()))?,
+        None => store.most_recent().ok_or_else(|| Error::NoBuildAvailable {
+            hint: "no builds in session".into(),
+        })?,
+    };
+
+    let mut parse_warnings = Vec::new();
+    let xcresult_result = if record.result_bundle_written && record.xcresult_path.exists() {
+        match read_build_results(&record.xcresult_path).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                parse_warnings.push(format!("xcresult parse failed: {e}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let stderr_result = if record.log_path.exists() {
+        let log_contents = std::fs::read_to_string(&record.log_path).unwrap_or_default();
+        if log_contents.is_empty() {
+            None
+        } else {
+            Some(parse_stderr(&log_contents))
+        }
+    } else {
+        None
+    };
+
+    let had_xcresult = xcresult_result.is_some();
+    let had_stderr = stderr_result.is_some();
+    let xcresult = xcresult_result.unwrap_or_default();
+    let stderr = stderr_result.unwrap_or_default();
+    let merged = merge_diagnostics(xcresult, stderr);
+
+    let source = if record.result_bundle_written && record.xcresult_path.exists() && had_xcresult {
+        DiagnosticSourceLabel::Xcresult
+    } else if had_stderr {
+        DiagnosticSourceLabel::StderrOnly
+    } else {
+        DiagnosticSourceLabel::None
+    };
+
+    Ok(DiagnosticOutput {
+        build_id: record.build_id,
+        build_status: record.status,
+        source,
+        merged,
+    })
 }

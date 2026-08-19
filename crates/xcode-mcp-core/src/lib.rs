@@ -6,5 +6,8 @@ pub mod security;
 pub mod store;
 pub mod xcode;
 
-pub use diagnostic::{Diagnostic, DiagnosticSource, FixIt, FixItRange, ParseResult, Severity};
+pub use diagnostic::{
+    Diagnostic, DiagnosticOutput, DiagnosticSource, DiagnosticSourceLabel, FixIt, FixItRange,
+    MergedDiagnostics, ParseResult, Severity,
+};
 pub use error::{Error, Result};
