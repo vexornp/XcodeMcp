@@ -11,3 +11,4 @@ pub use diagnostic::{
     MergedDiagnostics, ParseResult, Severity,
 };
 pub use error::{Error, Result};
+pub use xcode::{BuildOutput, BuildParams, SupervisedResult};
