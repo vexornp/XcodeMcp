@@ -1,5 +1,8 @@
+use std::path::Path;
+
 use crate::diagnostic::{Diagnostic, DiagnosticSource, FixIt, FixItRange, ParseResult, Severity};
 use crate::error::{Error, Result};
+use crate::xcode::{build_xcresulttool_command, run_supervised};
 
 pub fn parse_build_results(json: &str) -> Result<ParseResult> {
     let root: serde_json::Value = serde_json::from_str(json)?;
@@ -118,4 +121,33 @@ fn parse_fix_it_range(val: &serde_json::Value) -> Option<FixItRange> {
         end_line: val.get("endLine")?.as_u64()? as u32,
         end_col: val.get("endColumn")?.as_u64()? as u32,
     })
+}
+
+pub async fn read_build_results(xcresult_path: &Path) -> Result<ParseResult> {
+    let cmd = build_xcresulttool_command(xcresult_path);
+    let result = run_supervised(cmd, 60, None).await?;
+    if result.timed_out {
+        return Err(Error::XcresulttoolFailed {
+            exit_code: None,
+            stderr_excerpt: "timed out".into(),
+        });
+    }
+    if result.exit_code != Some(0) {
+        let excerpt = String::from_utf8_lossy(&result.stderr)
+            .chars()
+            .take(2000)
+            .collect();
+        return Err(Error::XcresulttoolFailed {
+            exit_code: result.exit_code,
+            stderr_excerpt: excerpt,
+        });
+    }
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    if stdout.trim().is_empty() {
+        return Err(Error::XcresulttoolFailed {
+            exit_code: result.exit_code,
+            stderr_excerpt: "empty output".into(),
+        });
+    }
+    parse_build_results(&stdout)
 }
