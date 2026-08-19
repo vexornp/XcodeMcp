@@ -1,0 +1,12 @@
+CompileSwiftSources /tmp/Build/Products/Debug/App.swiftmodule (in target 'App' from project 'App')
+    cd /tmp/App
+    /usr/bin/swiftc ...
+/tmp/App/Sources/App/main.swift:10:5: error: use of undeclared identifier 'foo'
+    print(foo)
+        ^~~
+/tmp/App/Sources/App/main.swift:10:5: note: did you mean 'bar'?
+** BUILD FAILED **
+
+The following build commands failed:
+	CompileSwiftSources normal arm64 (in target 'App' from project 'App')
+(1 failure)

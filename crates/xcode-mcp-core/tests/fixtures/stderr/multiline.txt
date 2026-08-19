@@ -1,0 +1,4 @@
+/tmp/App/Sources/App/main.swift:10:5: error: type 'Any' has no member 'nonexistent'
+    let x = Any.nonexistent(
+            ~~~ ^~~~~~~~~~~~~
+/tmp/App/Sources/App/main.swift:15:1: error: expected expression

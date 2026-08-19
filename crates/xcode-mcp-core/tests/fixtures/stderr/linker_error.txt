@@ -1,0 +1,6 @@
+Ld /tmp/Build/Products/Debug/App normal (in target 'App' from project 'App')
+    cd /tmp/App
+    /usr/bin/clang ...
+ld: symbol(s) not found for architecture arm64
+ld: warning: ignoring duplicate library '-lfoo'
+** BUILD FAILED **

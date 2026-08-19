@@ -1,0 +1,6 @@
+/tmp/App/Sources/App/main.swift:5:9: warning: variable 'x' was never used
+    let x = 42
+        ^
+/tmp/App/Sources/App/main.swift:10:5: error: use of undeclared identifier 'foo'
+/tmp/App/Sources/App/main.swift:20:12: note: previous declaration here
+** BUILD FAILED **

@@ -1,0 +1,6 @@
+Command PhaseScriptExecution failed with a nonzero exit code
+** BUILD FAILED **
+
+The following build commands failed:
+    PhaseScriptExecution Run\ Script (in target 'App' from project 'App')
+(1 failure)
