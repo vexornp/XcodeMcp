@@ -46,10 +46,10 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
         .create(true)
         .append(true)
         .open(log_dir.join("server.log"))?;
-    tracing_subscriber::fmt()
+    let _ = tracing_subscriber::fmt()
         .with_writer(std::sync::Mutex::new(log_file))
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+        .try_init();
     tracing::info!(
         "xcode-mcp server starting: root={}, result_dir={}, log_dir={}",
         root.display(),
@@ -77,7 +77,13 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         line.clear();
-        let n = reader.read_line(&mut line).await?;
+        let n = match reader.read_line(&mut line).await {
+            Ok(n) => n,
+            Err(e) => {
+                tracing::error!("stdin read error: {e}");
+                break;
+            }
+        };
         if n == 0 {
             break;
         }
@@ -105,8 +111,9 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
 
         let result: Option<Result<Value, Value>> = match method {
             "initialize" => Some(Ok(handle_initialize())),
+            "ping" => Some(Ok(json!({}))),
             "tools/list" => Some(Ok(handle_list_tools())),
-            "tools/call" => Some(Ok(server.handle_call_tool(&params).await)),
+            "tools/call" => Some(server.handle_call_tool(&params).await),
             _ => Some(Err(jsonrpc_error(
                 -32601,
                 &format!("method not found: {method}"),
@@ -118,9 +125,21 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(value) => json!({ "jsonrpc": "2.0", "id": id, "result": value }),
                 Err(err) => json!({ "jsonrpc": "2.0", "id": id, "error": err }),
             };
-            let serialized = serde_json::to_string(&response)?;
-            writeln!(stdout, "{serialized}")?;
-            stdout.flush()?;
+            let serialized = match serde_json::to_string(&response) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("response serialization error: {e}");
+                    break;
+                }
+            };
+            if let Err(e) = writeln!(stdout, "{serialized}") {
+                tracing::error!("stdout write error: {e}");
+                break;
+            }
+            if let Err(e) = stdout.flush() {
+                tracing::error!("stdout flush error: {e}");
+                break;
+            }
         }
     }
 
@@ -186,7 +205,10 @@ fn handle_list_tools() -> Value {
 }
 
 impl XcodeMcpServer {
-    async fn handle_call_tool(&self, params: &Value) -> Value {
+    /// Returns `Ok(CallToolResult)` for valid tool calls (with `isError: true`
+    /// for tool execution failures), or `Err(jsonrpc_error)` for protocol-level
+    /// errors (missing params, unknown tool).
+    async fn handle_call_tool(&self, params: &Value) -> Result<Value, Value> {
         let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
         let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
 
@@ -195,58 +217,51 @@ impl XcodeMcpServer {
                 let project = arguments
                     .get("project_or_workspace")
                     .and_then(|p| p.as_str())
-                    .ok_or_else(|| jsonrpc_error(-32602, "project_or_workspace required"));
-                match project {
-                    Ok(project) => list_schemes(project, &self.root)
-                        .await
-                        .map(|info| serde_json::to_value(&info).unwrap_or(Value::Null))
-                        .map_err(|e| jsonrpc_error(-32603, &format!("{e}"))),
-                    Err(e) => Err(e),
-                }
+                    .ok_or_else(|| jsonrpc_error(-32602, "project_or_workspace required"))?;
+                list_schemes(project, &self.root)
+                    .await
+                    .map(|info| serde_json::to_value(&info).unwrap_or(Value::Null))
+                    .map_err(|e| jsonrpc_error(-32603, &format!("{e}")))
             }
             "xcode_build" => {
                 let project = arguments
                     .get("project_or_workspace")
-                    .and_then(|p| p.as_str());
-                let scheme = arguments.get("scheme").and_then(|s| s.as_str());
-                match (project, scheme) {
-                    (Some(project), Some(scheme)) => {
-                        let build_params = BuildParams {
-                            project_or_workspace: project.to_string(),
-                            scheme: scheme.to_string(),
-                            action: arguments
-                                .get("action")
-                                .and_then(|a| a.as_str())
-                                .map(String::from),
-                            configuration: arguments
-                                .get("configuration")
-                                .and_then(|c| c.as_str())
-                                .map(String::from),
-                            destination: arguments
-                                .get("destination")
-                                .and_then(|d| d.as_str())
-                                .map(String::from),
-                            timeout_secs: arguments
-                                .get("timeout_secs")
-                                .and_then(|t| t.as_u64())
-                                .map(|n| n as u32),
-                        };
-                        run_build(
-                            build_params,
-                            &self.root,
-                            &self.result_dir,
-                            &self.log_dir,
-                            &self.store,
-                        )
-                        .await
-                        .map(|output| serde_json::to_value(&output).unwrap_or(Value::Null))
-                        .map_err(|e| jsonrpc_error(-32603, &format!("{e}")))
-                    }
-                    _ => Err(jsonrpc_error(
-                        -32602,
-                        "project_or_workspace and scheme required",
-                    )),
-                }
+                    .and_then(|p| p.as_str())
+                    .ok_or_else(|| jsonrpc_error(-32602, "project_or_workspace required"))?;
+                let scheme = arguments
+                    .get("scheme")
+                    .and_then(|s| s.as_str())
+                    .ok_or_else(|| jsonrpc_error(-32602, "scheme required"))?;
+                let build_params = BuildParams {
+                    project_or_workspace: project.to_string(),
+                    scheme: scheme.to_string(),
+                    action: arguments
+                        .get("action")
+                        .and_then(|a| a.as_str())
+                        .map(String::from),
+                    configuration: arguments
+                        .get("configuration")
+                        .and_then(|c| c.as_str())
+                        .map(String::from),
+                    destination: arguments
+                        .get("destination")
+                        .and_then(|d| d.as_str())
+                        .map(String::from),
+                    timeout_secs: arguments
+                        .get("timeout_secs")
+                        .and_then(|t| t.as_u64())
+                        .map(|n| n as u32),
+                };
+                run_build(
+                    build_params,
+                    &self.root,
+                    &self.result_dir,
+                    &self.log_dir,
+                    &self.store,
+                )
+                .await
+                .map(|output| serde_json::to_value(&output).unwrap_or(Value::Null))
+                .map_err(|e| jsonrpc_error(-32603, &format!("{e}")))
             }
             "xcode_get_build_errors" => {
                 let build_id = arguments.get("build_id").and_then(|b| b.as_str());
@@ -255,27 +270,27 @@ impl XcodeMcpServer {
                     .map(|output| serde_json::to_value(&output).unwrap_or(Value::Null))
                     .map_err(|e| jsonrpc_error(-32603, &format!("{e}")))
             }
-            _ => Err(jsonrpc_error(-32602, &format!("unknown tool: {name}"))),
+            _ => return Err(jsonrpc_error(-32602, &format!("unknown tool: {name}"))),
         };
 
         match result {
             Ok(value) => {
                 let text =
                     serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
-                json!({
+                Ok(json!({
                     "content": [{ "type": "text", "text": text }],
                     "isError": false
-                })
+                }))
             }
             Err(err) => {
                 let text = err
                     .get("message")
                     .and_then(|m| m.as_str())
                     .unwrap_or("unknown error");
-                json!({
+                Ok(json!({
                     "content": [{ "type": "text", "text": format!("Error: {text}") }],
                     "isError": true
-                })
+                }))
             }
         }
     }
