@@ -1,0 +1,61 @@
+{
+  "actions": [
+    {
+      "_results": {
+        "issues": [
+          {
+            "issueType": "BuildError",
+            "message": "use of undeclared identifier 'foo'",
+            "category": "Swift Compiler Error",
+            "documentLocationInCreatingWorkspace": {
+              "url": "file:///tmp/App/Sources/App/main.swift#Line=10&Column=5"
+            },
+            "fixIts": [
+              {
+                "message": "Replace 'foo' with 'bar'",
+                "range": {"startLine": 10, "startColumn": 5, "endLine": 10, "endColumn": 8}
+              }
+            ]
+          },
+          {
+            "issueType": "BuildError",
+            "message": "value of optional type 'String?' must be unwrapped",
+            "category": "Swift Compiler Error",
+            "documentLocationInCreatingWorkspace": {
+              "url": "file:///tmp/App/Sources/App/main.swift#Line=20&Column=12"
+            }
+          },
+          {
+            "issueType": "BuildWarning",
+            "message": "variable 'x' was never used",
+            "category": "Swift Compiler Warning",
+            "documentLocationInCreatingWorkspace": {
+              "url": "file:///tmp/App/Sources/App/main.swift#Line=5&Column=9"
+            }
+          },
+          {
+            "issueType": "BuildWarning",
+            "message": "deprecated API usage",
+            "category": "Deprecation Warning",
+            "documentLocationInCreatingWorkspace": {
+              "url": "file:///tmp/App/Sources/App/main.swift#Line=15&Column=1"
+            }
+          },
+          {
+            "issueType": "BuildWarning",
+            "message": "unused import",
+            "category": "Swift Compiler Warning"
+          },
+          {
+            "issueType": "Note",
+            "message": "previous declaration here",
+            "category": "Swift Compiler",
+            "documentLocationInCreatingWorkspace": {
+              "url": "file:///tmp/App/Sources/App/main.swift#Line=3&Column=1"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

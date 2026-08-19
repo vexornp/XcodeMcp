@@ -1,0 +1,4 @@
+{"actions": [{"_results": {"issues": [
+  {"issueType": "BuildError", "message": "linker failed", "category": "Linker",
+   "documentLocationInCreatingWorkspace": {"url": "not-a-valid-url"}}
+]}}]}

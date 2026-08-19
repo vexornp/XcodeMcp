@@ -1,5 +1,6 @@
 pub mod diagnostic;
 pub mod error;
+pub mod result_bundle;
 pub mod scheme;
 pub mod security;
 
