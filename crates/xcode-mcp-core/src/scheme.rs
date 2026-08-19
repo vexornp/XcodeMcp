@@ -1,4 +1,8 @@
+use std::path::Path;
+
 use crate::error::{Error, Result};
+use crate::security::validate_project_or_workspace;
+use crate::xcode::{build_list_schemes_command, run_supervised};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,4 +90,28 @@ fn dedup_sorted(mut v: Vec<String>) -> Vec<String> {
     v.sort();
     v.dedup();
     v
+}
+
+pub async fn list_schemes(project_or_workspace: &str, root: &Path) -> Result<ListInfo> {
+    let validated_path = validate_project_or_workspace(project_or_workspace, root)?;
+    let cmd = build_list_schemes_command(&validated_path);
+    let result = run_supervised(cmd, 30, None).await?;
+    if result.timed_out {
+        return Err(crate::error::Error::XcodeListFailed {
+            exit_code: None,
+            stderr_excerpt: "timed out".into(),
+        });
+    }
+    if result.exit_code != Some(0) {
+        let excerpt = String::from_utf8_lossy(&result.stderr)
+            .chars()
+            .take(2000)
+            .collect();
+        return Err(crate::error::Error::XcodeListFailed {
+            exit_code: result.exit_code,
+            stderr_excerpt: excerpt,
+        });
+    }
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    parse_list_output(&stdout)
 }
