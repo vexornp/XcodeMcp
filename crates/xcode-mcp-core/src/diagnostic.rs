@@ -147,3 +147,70 @@ fn infer_category(file: &Option<String>, message: &str) -> Option<String> {
     }
     Some("Compiler".into())
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MergedDiagnostics {
+    pub errors: Vec<Diagnostic>,
+    pub warnings: Vec<Diagnostic>,
+    pub notes: Vec<Diagnostic>,
+    pub parse_warnings: Vec<String>,
+}
+
+#[allow(clippy::type_complexity)]
+pub fn merge_diagnostics(xcresult: ParseResult, stderr: ParseResult) -> MergedDiagnostics {
+    let mut parse_warnings = xcresult.parse_warnings;
+    parse_warnings.extend(stderr.parse_warnings);
+    let mut all: Vec<Diagnostic> = xcresult.diagnostics;
+    all.extend(stderr.diagnostics);
+    let mut seen: Vec<(Option<String>, Option<u32>, Option<u32>, Severity, String)> = Vec::new();
+    let mut deduped: Vec<Diagnostic> = Vec::new();
+    for d in &all {
+        let norm = normalize_message(&d.message);
+        let key = (d.file.clone(), d.line, d.column, d.severity.clone(), norm);
+        if seen.contains(&key) {
+            continue;
+        }
+        seen.push(key);
+        deduped.push(d.clone());
+    }
+    let mut errors: Vec<_> = deduped
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .cloned()
+        .collect();
+    let mut warnings: Vec<_> = deduped
+        .iter()
+        .filter(|d| d.severity == Severity::Warning)
+        .cloned()
+        .collect();
+    let mut notes: Vec<_> = deduped
+        .iter()
+        .filter(|d| d.severity == Severity::Note)
+        .cloned()
+        .collect();
+    let cmp = |a: &Diagnostic, b: &Diagnostic| {
+        (
+            a.file.as_deref().unwrap_or(""),
+            a.line.unwrap_or(0),
+            a.column.unwrap_or(0),
+        )
+            .cmp(&(
+                b.file.as_deref().unwrap_or(""),
+                b.line.unwrap_or(0),
+                b.column.unwrap_or(0),
+            ))
+    };
+    errors.sort_by(cmp);
+    warnings.sort_by(cmp);
+    notes.sort_by(cmp);
+    MergedDiagnostics {
+        errors,
+        warnings,
+        notes,
+        parse_warnings,
+    }
+}
+
+fn normalize_message(msg: &str) -> String {
+    msg.split_whitespace().collect::<Vec<_>>().join(" ")
+}
