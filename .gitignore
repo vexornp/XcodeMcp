@@ -1,2 +1,4 @@
 /target
 /.cargo
+crates/xcode-mcp-core/tests/fixtures/MiniApp/.xcode-mcp-results/
+crates/xcode-mcp-core/tests/fixtures/MiniApp/.xcode-mcp-logs/

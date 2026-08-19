@@ -32,8 +32,7 @@ pub fn parse_list_output(stdout: &str) -> Result<ListInfo> {
             current_section = None;
             continue;
         }
-        if trimmed.ends_with(':') && !line.starts_with(char::is_whitespace) {
-            let header = &trimmed[..trimmed.len() - 1];
+        if let Some(header) = trimmed.strip_suffix(':') {
             current_section = match header {
                 "Schemes" => {
                     found_any_section = true;

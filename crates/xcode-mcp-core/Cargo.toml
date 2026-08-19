@@ -20,3 +20,11 @@ libc.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[test]]
+name = "build"
+path = "tests/live/build.rs"
+
+[[test]]
+name = "errors"
+path = "tests/live/errors.rs"

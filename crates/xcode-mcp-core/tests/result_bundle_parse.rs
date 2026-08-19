@@ -100,3 +100,21 @@ fn all_diagnostics_tagged_xcresult_source() {
         assert_eq!(d.source, DiagnosticSource::Xcresult);
     }
 }
+
+#[test]
+fn parses_build_results_format() {
+    let result = parse_build_results(&fixture("build_results_format.json")).unwrap();
+    assert_eq!(result.diagnostics.len(), 2);
+    let error = result
+        .diagnostics
+        .iter()
+        .find(|d| d.severity == Severity::Error)
+        .unwrap();
+    assert_eq!(error.message, "Cannot find 'nonexistentVariable' in scope");
+    assert_eq!(
+        error.file.as_deref(),
+        Some("/tmp/MiniApp/Sources/MiniAppBroken/main.swift")
+    );
+    assert_eq!(error.line, Some(3));
+    assert_eq!(error.column, Some(6));
+}

@@ -1,0 +1,17 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -list -project MiniApp.xcodeproj
+
+Information about project "MiniApp":
+    Targets:
+        MiniApp
+        MiniAppBroken
+
+    Build Configurations:
+        Debug
+        Release
+
+    If no build configuration is specified and -scheme is not passed then "Release" is used.
+
+    Schemes:
+        MiniApp
+        MiniAppBroken

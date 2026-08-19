@@ -49,3 +49,11 @@ fn malformed_output_returns_error() {
 fn empty_input_returns_error() {
     assert!(parse_list_output("").is_err());
 }
+
+#[test]
+fn parses_realistic_xcodebuild_output() {
+    let info = parse_list_output(&fixture("xcode_realistic.txt")).unwrap();
+    assert_eq!(info.schemes, vec!["MiniApp", "MiniAppBroken"]);
+    assert_eq!(info.targets, vec!["MiniApp", "MiniAppBroken"]);
+    assert_eq!(info.configurations, vec!["Debug", "Release"]);
+}

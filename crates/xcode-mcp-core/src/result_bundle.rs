@@ -6,25 +6,42 @@ use crate::xcode::{build_xcresulttool_command, run_supervised};
 
 pub fn parse_build_results(json: &str) -> Result<ParseResult> {
     let root: serde_json::Value = serde_json::from_str(json)?;
-    let actions = root
-        .get("actions")
-        .and_then(|a| a.as_array())
-        .ok_or(Error::UnrecognizedResultFormat)?;
     let mut diagnostics = Vec::new();
     let mut parse_warnings = Vec::new();
-    for action in actions {
-        if let Some(issues) = action
-            .get("_results")
-            .and_then(|r| r.get("issues"))
-            .and_then(|i| i.as_array())
-        {
-            for issue in issues {
-                if let Some(d) = parse_issue(issue, &mut parse_warnings) {
-                    diagnostics.push(d);
+    let mut recognized = false;
+
+    if root.get("actions").and_then(|a| a.as_array()).is_some() {
+        recognized = true;
+        for action in root["actions"].as_array().unwrap() {
+            if let Some(issues) = action
+                .get("_results")
+                .and_then(|r| r.get("issues"))
+                .and_then(|i| i.as_array())
+            {
+                for issue in issues {
+                    if let Some(d) = parse_issue(issue, &mut parse_warnings) {
+                        diagnostics.push(d);
+                    }
+                }
+            }
+        }
+    } else {
+        for key in ["errors", "warnings", "analyzerWarnings", "analyzerErrors"] {
+            if let Some(issues) = root.get(key).and_then(|a| a.as_array()) {
+                recognized = true;
+                for issue in issues {
+                    if let Some(d) = parse_issue(issue, &mut parse_warnings) {
+                        diagnostics.push(d);
+                    }
                 }
             }
         }
     }
+
+    if !recognized {
+        return Err(Error::UnrecognizedResultFormat);
+    }
+
     Ok(ParseResult {
         diagnostics,
         parse_warnings,
@@ -37,12 +54,28 @@ fn parse_issue(issue: &serde_json::Value, warnings: &mut Vec<String>) -> Option<
         .and_then(|t| t.as_str())
         .unwrap_or("");
     let severity = match issue_type {
-        "BuildError" | "AnalyzerError" => Severity::Error,
-        "BuildWarning" | "AnalyzerWarning" => Severity::Warning,
+        "BuildError"
+        | "AnalyzerError"
+        | "Swift Compiler Error"
+        | "Build Error"
+        | "Analyzer Error" => Severity::Error,
+        "BuildWarning"
+        | "AnalyzerWarning"
+        | "Swift Compiler Warning"
+        | "Build Warning"
+        | "Analyzer Warning"
+        | "Deprecation Warning" => Severity::Warning,
         "Note" => Severity::Note,
         other => {
-            warnings.push(format!("unknown issueType: {other}"));
-            Severity::Note
+            let lower = other.to_lowercase();
+            if lower.contains("error") {
+                Severity::Error
+            } else if lower.contains("warning") {
+                Severity::Warning
+            } else {
+                warnings.push(format!("unknown issueType: {other}"));
+                Severity::Note
+            }
         }
     };
     let message = issue
@@ -77,7 +110,8 @@ fn parse_document_location(
     let url = issue
         .get("documentLocationInCreatingWorkspace")
         .and_then(|d| d.get("url"))
-        .and_then(|u| u.as_str());
+        .and_then(|u| u.as_str())
+        .or_else(|| issue.get("sourceURL").and_then(|u| u.as_str()));
     let Some(url) = url else {
         return (None, None, None);
     };
@@ -94,8 +128,8 @@ fn parse_document_location(
     };
     (
         file,
-        extract_num(fragment, "Line="),
-        extract_num(fragment, "Column="),
+        extract_num(fragment, "Line=").or_else(|| extract_num(fragment, "StartingLineNumber=")),
+        extract_num(fragment, "Column=").or_else(|| extract_num(fragment, "StartingColumnNumber=")),
     )
 }
 

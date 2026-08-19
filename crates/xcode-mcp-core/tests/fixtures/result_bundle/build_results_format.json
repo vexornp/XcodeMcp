@@ -1,0 +1,30 @@
+{
+  "actionTitle": "Build \"MiniAppBroken\"",
+  "analyzerWarningCount": 0,
+  "analyzerWarnings": [],
+  "destination": {
+    "architecture": "arm64",
+    "deviceName": "My Mac",
+    "platform": "macOS"
+  },
+  "errorCount": 1,
+  "errors": [
+    {
+      "className": "DVTTextDocumentLocation",
+      "issueType": "Swift Compiler Error",
+      "message": "Cannot find 'nonexistentVariable' in scope",
+      "sourceURL": "file:///tmp/MiniApp/Sources/MiniAppBroken/main.swift#StartingColumnNumber=6&StartingLineNumber=3&EndingColumnNumber=6&EndingLineNumber=3&Timestamp=808844436.77363"
+    }
+  ],
+  "startTime": 1787151636.767,
+  "status": "failed",
+  "warningCount": 1,
+  "warnings": [
+    {
+      "className": "DVTTextDocumentLocation",
+      "issueType": "Swift Compiler Warning",
+      "message": "initialization of variable 'unused' was never used",
+      "sourceURL": "file:///tmp/MiniApp/Sources/MiniAppBroken/main.swift#StartingColumnNumber=9&StartingLineNumber=6&EndingColumnNumber=14&EndingLineNumber=6&Timestamp=808844436.77363"
+    }
+  ]
+}
