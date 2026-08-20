@@ -17,9 +17,6 @@ class XcodeMcp < Formula
   head "https://github.com/YOUR_USERNAME/XcodeMcp.git", branch: "main"
 
   depends_on "rust" => :build
-  on_macos do
-    depends_on "xcodebuild" => :test
-  end
 
   def install
     system "cargo", "install", *std_cargo_args(path: "crates/xcode-mcp")
