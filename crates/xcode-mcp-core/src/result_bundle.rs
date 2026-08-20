@@ -67,14 +67,19 @@ fn parse_issue(issue: &serde_json::Value, warnings: &mut Vec<String>) -> Option<
         | "Deprecation Warning" => Severity::Warning,
         "Note" => Severity::Note,
         other => {
-            let lower = other.to_lowercase();
-            if lower.contains("error") {
-                Severity::Error
-            } else if lower.contains("warning") {
-                Severity::Warning
-            } else {
-                warnings.push(format!("unknown issueType: {other}"));
+            if other.is_empty() {
+                warnings.push("issue with empty issueType".to_string());
                 Severity::Note
+            } else {
+                let lower = other.to_lowercase();
+                if lower.contains("error") {
+                    Severity::Error
+                } else if lower.contains("warning") {
+                    Severity::Warning
+                } else {
+                    warnings.push(format!("unknown issueType: {other}"));
+                    Severity::Note
+                }
             }
         }
     };

@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use xcode_mcp_core::{
     diagnostic::load_diagnostics,
     scheme::list_schemes,
@@ -88,8 +88,8 @@ pub async fn run_debug(subcommand: DebugCommand) -> Result<(), Box<dyn std::erro
             log_dir,
         } => {
             let root = resolve_root(&root, &project)?;
-            let result_dir = result_dir.unwrap_or_else(|| root.join(".xcode-mcp-results"));
-            let log_dir = log_dir.unwrap_or_else(|| root.join(".xcode-mcp-logs"));
+            let result_dir = resolve_dir(result_dir, &root, ".xcode-mcp-results")?;
+            let log_dir = resolve_dir(log_dir, &root, ".xcode-mcp-logs")?;
             std::fs::create_dir_all(&result_dir)?;
             std::fs::create_dir_all(&log_dir)?;
             let store = BuildStore::new(32);
@@ -110,8 +110,8 @@ pub async fn run_debug(subcommand: DebugCommand) -> Result<(), Box<dyn std::erro
             log_dir,
         } => {
             let root = std::env::current_dir()?;
-            let result_dir = result_dir.unwrap_or_else(|| root.join(".xcode-mcp-results"));
-            let log_dir = log_dir.unwrap_or_else(|| root.join(".xcode-mcp-logs"));
+            let result_dir = resolve_dir(result_dir, &root, ".xcode-mcp-results")?;
+            let log_dir = resolve_dir(log_dir, &root, ".xcode-mcp-logs")?;
             let store = BuildStore::new(32);
             let output =
                 load_diagnostics(build_id.as_deref(), &store, &result_dir, &log_dir).await?;
@@ -137,6 +137,22 @@ fn resolve_root(
     } else {
         let p = PathBuf::from(project);
         Ok(p.parent().ok_or("cannot determine root")?.canonicalize()?)
+    }
+}
+
+fn resolve_dir(
+    dir: Option<PathBuf>,
+    root: &Path,
+    default_subdir: &str,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    match dir {
+        Some(p) => {
+            if !p.is_absolute() {
+                return Err("--result-dir/--log-dir must be absolute".into());
+            }
+            Ok(p)
+        }
+        None => Ok(root.join(default_subdir)),
     }
 }
 

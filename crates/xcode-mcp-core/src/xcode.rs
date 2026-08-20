@@ -16,14 +16,7 @@ use tokio::sync::Semaphore;
 pub fn build_list_schemes_command(project_or_workspace: &Path) -> Command {
     let mut cmd = Command::new("xcrun");
     cmd.arg("xcodebuild").arg("-list");
-    if project_or_workspace
-        .to_string_lossy()
-        .ends_with(".xcworkspace")
-    {
-        cmd.arg("-workspace").arg(project_or_workspace);
-    } else {
-        cmd.arg("-project").arg(project_or_workspace);
-    }
+    add_project_or_workspace_arg(&mut cmd, project_or_workspace);
     cmd
 }
 
@@ -39,14 +32,7 @@ pub fn build_xcodebuild_command(
 ) -> Command {
     let mut cmd = Command::new("xcrun");
     cmd.arg("xcodebuild").arg("-scheme").arg(scheme);
-    if project_or_workspace
-        .to_string_lossy()
-        .ends_with(".xcworkspace")
-    {
-        cmd.arg("-workspace").arg(project_or_workspace);
-    } else {
-        cmd.arg("-project").arg(project_or_workspace);
-    }
+    add_project_or_workspace_arg(&mut cmd, project_or_workspace);
     if let Some(cfg) = configuration {
         cmd.arg("-configuration").arg(cfg);
     }
@@ -70,6 +56,14 @@ pub fn build_xcodebuild_command(
         }
     }
     cmd
+}
+
+fn add_project_or_workspace_arg(cmd: &mut Command, path: &Path) {
+    if path.to_string_lossy().ends_with(".xcworkspace") {
+        cmd.arg("-workspace").arg(path);
+    } else {
+        cmd.arg("-project").arg(path);
+    }
 }
 
 pub fn build_xcresulttool_command(xcresult_path: &Path) -> Command {
@@ -302,8 +296,11 @@ pub async fn run_build(
     let truncated_stderr_excerpt =
         if (status == "Failed" || status == "TimedOut") && !result_bundle_written {
             let s = String::from_utf8_lossy(&result.stderr);
-            let chars: Vec<char> = s.chars().rev().take(2048).collect();
-            Some(chars.into_iter().rev().collect())
+            let bytes = s.as_bytes();
+            let start = bytes.len().saturating_sub(2048);
+            // snap to char boundary to avoid panicking on multi-byte UTF-8
+            let start = s.ceil_char_boundary(start);
+            Some(s[start..].to_string())
         } else {
             None
         };

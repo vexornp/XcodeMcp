@@ -54,6 +54,9 @@ fn extracts_fix_its() {
     assert_eq!(fix_its.len(), 1);
     assert_eq!(fix_its[0].message, "Replace 'foo' with 'bar'");
     assert_eq!(fix_its[0].range.as_ref().unwrap().start_line, 10);
+    assert_eq!(fix_its[0].range.as_ref().unwrap().start_col, 5);
+    assert_eq!(fix_its[0].range.as_ref().unwrap().end_line, 10);
+    assert_eq!(fix_its[0].range.as_ref().unwrap().end_col, 8);
 }
 
 #[test]

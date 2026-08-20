@@ -306,7 +306,7 @@ pub async fn load_diagnostics(
     let mut merged = merge_diagnostics(xcresult, stderr);
     merged.parse_warnings.extend(parse_warnings);
 
-    let source = if record.result_bundle_written && record.xcresult_path.exists() && had_xcresult {
+    let source = if had_xcresult {
         DiagnosticSourceLabel::Xcresult
     } else if had_stderr {
         DiagnosticSourceLabel::StderrOnly

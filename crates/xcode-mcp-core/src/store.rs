@@ -48,7 +48,9 @@ impl BuildStore {
     pub fn push(&self, record: BuildRecord) {
         let mut records = self.records.lock().unwrap();
         if records.len() >= self.cap {
-            records.pop_front();
+            if let Some(evicted) = records.pop_front() {
+                cleanup_build_artifacts(&evicted);
+            }
         }
         records.push_back(record);
     }
@@ -64,5 +66,27 @@ impl BuildStore {
             .iter()
             .find(|r| r.build_id == build_id)
             .cloned()
+    }
+}
+
+/// Best-effort cleanup of on-disk artifacts for an evicted build record.
+/// Removes the `.xcresult` bundle and `.log` file. Errors are logged via
+/// `tracing` and never propagated — the store eviction must not fail.
+fn cleanup_build_artifacts(record: &BuildRecord) {
+    if record.xcresult_path.exists() {
+        if let Err(e) = std::fs::remove_dir_all(&record.xcresult_path) {
+            tracing::warn!(
+                "failed to remove evicted xcresult {}: {e}",
+                record.xcresult_path.display()
+            );
+        }
+    }
+    if record.log_path.exists() {
+        if let Err(e) = std::fs::remove_file(&record.log_path) {
+            tracing::warn!(
+                "failed to remove evicted log {}: {e}",
+                record.log_path.display()
+            );
+        }
     }
 }
