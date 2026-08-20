@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use xcode_mcp_core::{
     diagnostic::load_diagnostics,
+    pod::{run_pod, PodParams},
     scheme::list_schemes,
     store::BuildStore,
     xcode::{run_build, BuildParams},
@@ -177,7 +178,9 @@ fn make_tool_list() -> Vec<Tool> {
                 "action": { "type": "string", "enum": ["build", "clean", "clean+build"] },
                 "configuration": { "type": "string", "enum": ["Debug", "Release"] },
                 "destination": { "type": "string" },
-                "timeout_secs": { "type": "integer" }
+                "timeout_secs": { "type": "integer" },
+                "pod_action": { "type": "string", "enum": ["install", "update"] },
+                "pod_timeout_secs": { "type": "integer" }
             },
             "required": ["project_or_workspace", "scheme"]
         }"#,
@@ -189,6 +192,18 @@ fn make_tool_list() -> Vec<Tool> {
             "properties": {
                 "build_id": { "type": "string" }
             }
+        }"#,
+    )
+    .unwrap();
+    let pod_schema: serde_json::Map<String, serde_json::Value> = serde_json::from_str(
+        r#"{
+            "type": "object",
+            "properties": {
+                "project_or_workspace": { "type": "string" },
+                "action": { "type": "string", "enum": ["install", "update"] },
+                "timeout_secs": { "type": "integer" }
+            },
+            "required": ["project_or_workspace", "action"]
         }"#,
     )
     .unwrap();
@@ -207,6 +222,11 @@ fn make_tool_list() -> Vec<Tool> {
             "xcode_get_build_errors",
             "Get structured build diagnostics for a build",
             errors_schema,
+        ),
+        Tool::new(
+            "xcode_pod",
+            "Run `pod install` or `pod update` in the project's directory to refresh Pods.xcworkspace references before building",
+            pod_schema,
         ),
     ]
 }
@@ -288,6 +308,19 @@ impl XcodeMcpServer {
                 .await
                 .map(|output| serde_json::to_value(&output).unwrap_or(serde_json::Value::Null))
                 .map_err(|e| e.to_string())
+            }
+            "xcode_pod" => {
+                let project = get_string_arg(&args, "project_or_workspace")?;
+                let action = get_string_arg(&args, "action")?;
+                let pod_params = PodParams {
+                    project_or_workspace: project,
+                    action: Some(action),
+                    timeout_secs: get_optional_u64_arg(&args, "timeout_secs").map(|n| n as u32),
+                };
+                run_pod(pod_params, &self.root, &self.log_dir)
+                    .await
+                    .map(|output| serde_json::to_value(&output).unwrap_or(serde_json::Value::Null))
+                    .map_err(|e| e.to_string())
             }
             _ => {
                 return Err(ErrorData::invalid_params(
