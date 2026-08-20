@@ -5,6 +5,7 @@ pub mod scheme;
 pub mod security;
 pub mod store;
 pub mod xcode;
+pub mod pod;
 
 pub use diagnostic::{
     Diagnostic, DiagnosticOutput, DiagnosticSource, DiagnosticSourceLabel, FixIt, FixItRange,
@@ -12,3 +13,4 @@ pub use diagnostic::{
 };
 pub use error::{Error, Result};
 pub use xcode::{BuildOutput, BuildParams, SupervisedResult};
+pub use pod::{PodOutput, PodParams};
