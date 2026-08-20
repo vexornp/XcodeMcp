@@ -36,7 +36,7 @@ async fn get_build_errors_returns_xcresult_diagnostics() {
         scheme: "MiniAppBroken".into(),
         action: Some("build".into()),
         configuration: Some("Debug".into()),
-        destination: Some("platform=macOS".into()),
+        destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(300),
     };
     let build_output = run_build(params, &root, &result_dir, &log_dir, &store)

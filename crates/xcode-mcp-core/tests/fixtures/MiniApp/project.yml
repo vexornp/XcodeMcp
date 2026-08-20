@@ -2,25 +2,27 @@ name: MiniApp
 options:
   bundleIdPrefix: com.xcode-mcp.test
   deploymentTarget:
-    macOS: "13.0"
+    iOS: "16.0"
   developmentLanguage: en
   createIntermediateGroups: true
 targets:
   MiniApp:
-    type: tool
-    platform: macOS
+    type: application
+    platform: iOS
     sources:
       - path: Sources/MiniApp
     settings:
       base:
         SWIFT_VERSION: "5.0"
         PRODUCT_NAME: "$(TARGET_NAME)"
+        GENERATE_INFOPLIST_FILE: YES
   MiniAppBroken:
-    type: tool
-    platform: macOS
+    type: application
+    platform: iOS
     sources:
       - path: Sources/MiniAppBroken
     settings:
       base:
         SWIFT_VERSION: "5.0"
         PRODUCT_NAME: "$(TARGET_NAME)"
+        GENERATE_INFOPLIST_FILE: YES

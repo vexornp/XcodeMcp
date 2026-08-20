@@ -49,7 +49,7 @@ async fn build_succeeds_for_valid_app() {
         scheme: "MiniApp".into(),
         action: Some("build".into()),
         configuration: Some("Debug".into()),
-        destination: Some("platform=macOS".into()),
+        destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(300),
     };
     let output = run_build(params, &root, &result_dir, &log_dir, &store)
@@ -76,7 +76,7 @@ async fn build_fails_for_broken_app() {
         scheme: "MiniAppBroken".into(),
         action: Some("build".into()),
         configuration: Some("Debug".into()),
-        destination: Some("platform=macOS".into()),
+        destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(300),
     };
     let output = run_build(params, &root, &result_dir, &log_dir, &store)
@@ -103,7 +103,7 @@ async fn build_times_out() {
         scheme: "MiniApp".into(),
         action: Some("clean+build".into()),
         configuration: Some("Debug".into()),
-        destination: Some("platform=macOS".into()),
+        destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(1),
     };
     let output = run_build(params, &root, &result_dir, &log_dir, &store)
