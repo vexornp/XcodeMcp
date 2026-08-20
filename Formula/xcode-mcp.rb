@@ -12,7 +12,7 @@ class XcodeMcp < Formula
   desc "MCP server that drives xcodebuild and parses build diagnostics"
   homepage "https://github.com/vexornp/XcodeMcp"
   url "https://github.com/vexornp/XcodeMcp/archive/refs/tags/v0.1.1.tar.gz"
-  sha256 "9774ba7ca19dccaa3df72c0739e444520c927857c5370702d7a019e6e710227a"
+  sha256 "2f701b172b81a240477cfe826eeba0a55e053baaf710c66b015752f60561c304"
   license "MIT"
   head "https://github.com/vexornp/XcodeMcp.git", branch: "main"
 
