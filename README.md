@@ -18,11 +18,53 @@ Binary at `target/release/xcode-mcp`.
 
 ## Configure
 
-Set `XCODE_MCP_ROOT` to the directory containing your `.xcodeproj`/`.xcworkspace` files:
+The server needs to know the root directory containing your `.xcodeproj`/`.xcworkspace` files. There are two ways to set this:
+
+### Option 1 — Environment variable (per-process)
+
+Set `XCODE_MCP_ROOT` in the `env` block of your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "xcode": {
+      "command": "xcode-mcp",
+      "args": ["serve"],
+      "env": { "XCODE_MCP_ROOT": "/path/to/your/projects" }
+    }
+  }
+}
+```
+
+### Option 2 — Per-user config file (recommended for shared MCP configs)
+
+If `XCODE_MCP_ROOT` is not set, the server reads `~/.config/xcode-mcp/config` (honoring `$XDG_CONFIG_HOME`). This lets each team member set their own path even when sharing a common `mcp.json`:
 
 ```bash
-export XCODE_MCP_ROOT=/path/to/your/projects
+mkdir -p ~/.config/xcode-mcp
+echo 'root = /Users/yourname/Developer/ios-projects' > ~/.config/xcode-mcp/config
 ```
+
+The shared `mcp.json` then needs no `env` block at all:
+
+```json
+{
+  "mcpServers": {
+    "xcode": {
+      "command": "xcode-mcp",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+Config file format (line-based, `#` for comments):
+```ini
+# my xcode-mcp config
+root = /Users/yourname/Developer/ios-projects
+```
+
+The environment variable takes precedence over the config file if both are set.
 
 Optional environment variables:
 
