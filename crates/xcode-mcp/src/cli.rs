@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use xcode_mcp_core::{
     diagnostic::load_diagnostics,
+    pod::{run_pod, PodParams},
     scheme::list_schemes,
     store::BuildStore,
     xcode::{run_build, BuildParams},
@@ -66,6 +67,19 @@ pub enum DebugCommand {
         #[arg(long)]
         log_dir: Option<PathBuf>,
     },
+    /// Run pod install or pod update in the project's directory
+    Pod {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        action: String,
+        #[arg(long)]
+        timeout_secs: Option<u32>,
+        #[arg(long)]
+        root: Option<String>,
+        #[arg(long)]
+        log_dir: Option<PathBuf>,
+    },
     /// Print MCP Inspector instructions
     InspectorHelp,
 }
@@ -121,6 +135,24 @@ pub async fn run_debug(subcommand: DebugCommand) -> Result<(), Box<dyn std::erro
             let store = BuildStore::new(32);
             let output =
                 load_diagnostics(build_id.as_deref(), &store, &result_dir, &log_dir).await?;
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+        DebugCommand::Pod {
+            project,
+            action,
+            timeout_secs,
+            root,
+            log_dir,
+        } => {
+            let root = resolve_root(&root, &project)?;
+            let log_dir = resolve_dir(log_dir, &root, ".xcode-mcp-logs")?;
+            std::fs::create_dir_all(&log_dir)?;
+            let params = PodParams {
+                project_or_workspace: project,
+                action: Some(action),
+                timeout_secs,
+            };
+            let output = run_pod(params, &root, &log_dir).await?;
             println!("{}", serde_json::to_string_pretty(&output)?);
         }
         DebugCommand::InspectorHelp => {
