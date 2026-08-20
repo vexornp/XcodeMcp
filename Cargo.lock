@@ -1285,7 +1285,7 @@ dependencies = [
 
 [[package]]
 name = "xcode-mcp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "rmcp",
@@ -1299,7 +1299,7 @@ dependencies = [
 
 [[package]]
 name = "xcode-mcp-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
  "regex",
