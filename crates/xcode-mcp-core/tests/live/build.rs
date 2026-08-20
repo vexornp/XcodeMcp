@@ -51,6 +51,8 @@ async fn build_succeeds_for_valid_app() {
         configuration: Some("Debug".into()),
         destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(300),
+        pod_action: None,
+        pod_timeout_secs: None,
     };
     let output = run_build(params, &root, &result_dir, &log_dir, &store)
         .await
@@ -78,6 +80,8 @@ async fn build_fails_for_broken_app() {
         configuration: Some("Debug".into()),
         destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(300),
+        pod_action: None,
+        pod_timeout_secs: None,
     };
     let output = run_build(params, &root, &result_dir, &log_dir, &store)
         .await
@@ -105,6 +109,8 @@ async fn build_times_out() {
         configuration: Some("Debug".into()),
         destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(1),
+        pod_action: None,
+        pod_timeout_secs: None,
     };
     let output = run_build(params, &root, &result_dir, &log_dir, &store)
         .await

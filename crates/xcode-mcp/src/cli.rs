@@ -104,6 +104,8 @@ pub async fn run_debug(subcommand: DebugCommand) -> Result<(), Box<dyn std::erro
                 configuration,
                 destination,
                 timeout_secs,
+                pod_action: None,
+                pod_timeout_secs: None,
             };
             let output = run_build(params, &root, &result_dir, &log_dir, &store).await?;
             println!("{}", serde_json::to_string_pretty(&output)?);

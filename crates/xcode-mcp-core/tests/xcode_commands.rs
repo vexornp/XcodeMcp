@@ -106,3 +106,20 @@ fn no_shell_invocation() {
     let cmd = build_list_schemes_command(&PathBuf::from("/tmp/App.xcodeproj"));
     assert_eq!(cmd.as_std().get_program().to_str().unwrap(), "xcrun");
 }
+
+#[test]
+fn build_params_accepts_pod_action_fields() {
+    use xcode_mcp_core::xcode::BuildParams;
+    let params = BuildParams {
+        project_or_workspace: "/tmp/App.xcodeproj".into(),
+        scheme: "App".into(),
+        action: Some("build".into()),
+        configuration: None,
+        destination: None,
+        timeout_secs: None,
+        pod_action: Some("install".into()),
+        pod_timeout_secs: Some(300),
+    };
+    assert_eq!(params.pod_action.as_deref(), Some("install"));
+    assert_eq!(params.pod_timeout_secs, Some(300));
+}

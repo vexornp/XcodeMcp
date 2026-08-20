@@ -262,6 +262,9 @@ impl XcodeMcpServer {
                     configuration: get_optional_string_arg(&args, "configuration"),
                     destination: get_optional_string_arg(&args, "destination"),
                     timeout_secs: get_optional_u64_arg(&args, "timeout_secs").map(|n| n as u32),
+                    pod_action: get_optional_string_arg(&args, "pod_action"),
+                    pod_timeout_secs: get_optional_u64_arg(&args, "pod_timeout_secs")
+                        .map(|n| n as u32),
                 };
                 run_build(
                     build_params,
