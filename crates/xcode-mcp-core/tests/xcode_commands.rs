@@ -37,7 +37,6 @@ fn build_command_has_required_flags() {
         Some("Debug"),
         Some("generic/platform=iOS"),
         &PathBuf::from("/tmp/result.xcresult"),
-        &PathBuf::from("/tmp/dd"),
     );
     let args = args_of(cmd);
     assert!(args.contains(&"-scheme".into()));
@@ -47,7 +46,9 @@ fn build_command_has_required_flags() {
     assert!(args.contains(&"-destination".into()));
     assert!(args.contains(&"generic/platform=iOS".into()));
     assert!(args.contains(&"-resultBundlePath".into()));
-    assert!(args.contains(&"-derivedDataPath".into()));
+    // Invariant: server never overrides DerivedData location — inherits
+    // Xcode's configured default so IDE build cache is reused.
+    assert!(!args.contains(&"-derivedDataPath".into()));
     assert!(args.contains(&"-quiet".into()));
     assert!(args.contains(&"build".into()));
     assert!(args.contains(&"CODE_SIGNING_ALLOWED=NO".into()));
@@ -62,7 +63,6 @@ fn build_command_clean_plus_build_passes_two_actions() {
         None,
         None,
         &PathBuf::from("/tmp/r.xcresult"),
-        &PathBuf::from("/tmp/dd"),
     );
     let args = args_of(cmd);
     assert!(args.contains(&"clean".into()));
@@ -80,7 +80,6 @@ fn build_command_uses_workspace_for_xcworkspace() {
         None,
         None,
         &PathBuf::from("/tmp/r.xcresult"),
-        &PathBuf::from("/tmp/dd"),
     );
     let args = args_of(cmd);
     assert!(args.contains(&"-workspace".into()));

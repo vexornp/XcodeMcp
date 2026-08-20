@@ -156,6 +156,10 @@ Report errors as `file:line:col — message` (the format a developer can jump to
 - **Re-running `xcode_build` repeatedly without reading errors** — each call is a full build. Always read diagnostics between iterations.
 - **Looping more than ~5 fix iterations without progress** — stop, summarize the stuck error, and ask the user.
 
+## Caveats
+
+- **IDE-vs-MCP build collision.** MCP builds inherit Xcode's configured DerivedData location (they do **not** pass `-derivedDataPath`), so they share the same build cache as the Xcode IDE. If a build fails immediately with a `database is locked` / `unable to attach to build system` style error and `xcode_get_build_errors` returns no diagnostics, the Xcode IDE may be building the same project — wait for the IDE build to finish and retry. The server's build permit serializes MCP-vs-MCP builds; it cannot serialize IDE-vs-MCP.
+
 ## Pre-Delivery Checklist
 
 Before telling the user the build is fixed/done:

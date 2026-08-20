@@ -205,16 +205,28 @@ xcode_build(
 
 ### Build lifecycle (`xcode.rs::run_build`, async)
 
+> **Revision (2026-08-20):** Originally the server allocated a per-build
+> `-derivedDataPath` under `result_dir/DerivedData/<build_id>` and `rm -rf`'d
+> it after each build. Changed to **inherit Xcode's configured default
+> DerivedData location** (typically `~/Library/Developer/Xcode/DerivedData/`,
+> or whatever the user set in Xcode → Settings → Locations) so MCP builds
+> reuse the IDE's build cache instead of compiling from scratch each time.
+> Consequence: cleanup was removed (deleting shared IDE state would force a
+> full rebuild in Xcode), and concurrent IDE-vs-MCP builds on the same
+> project can collide on `build.db` — see §15 for the v2 concurrency impact.
+> If stale state is suspected, callers should use `action: "clean+build"`.
+
 1. **Reserve `build_id` + paths.** Generate UUID. Allocate:
    - `xcresult_path = result_dir/<build_id>.xcresult`
-   - `derived_data_path = result_dir/DerivedData/<build_id>`
    - `log_path = log_dir/<build_id>.log`
    Pre-create the log file (truncate). The `.xcresult` dir is created by xcodebuild.
+   **No `-derivedDataPath`** — xcodebuild writes to its configured default
+   (inherits the user's Xcode setting), so MCP builds share the IDE cache.
 
 2. **Acquire the global build permit.** `tokio::sync::Semaphore` with 1 permit, held for the whole build. Serialized execution. Reads (`xcode_list_schemes`, `xcode_get_build_errors`) don't touch this permit; only `xcode_build` does. Awaiting on the permit has no separate timeout — the caller's `timeout_secs` covers the whole call including wait time, so a stuck queue can't silently extend a build.
 
 3. **Spawn xcodebuild in a new process group.**
-   - `Command::new("xcrun")`, args: `["xcodebuild", "-scheme", <scheme>]`, `-project` XOR `-workspace` `<validated_path>`, `-configuration <cfg>` if set, `-destination <dest>` if set, `-resultBundlePath <xcresult_path>`, `-derivedDataPath <derived_data_path>`, `-quiet`, then `build` / `clean` / `clean build` (two action args for `clean+build` — single invocation, matches Xcode semantics).
+   - `Command::new("xcrun")`, args: `["xcodebuild", "-scheme", <scheme>]`, `-project` XOR `-workspace` `<validated_path>`, `-configuration <cfg>` if set, `-destination <dest>` if set, `-resultBundlePath <xcresult_path>`, `-quiet`, then `build` / `clean` / `clean build` (two action args for `clean+build` — single invocation, matches Xcode semantics). **No `-derivedDataPath`** — inherits Xcode's configured default.
    - Process group via `Command::pre_exec` closure calling `libc::setsid()` before exec. Child becomes session leader → its pid == pgid. Wrapped in `unsafe` with a comment.
    - `stdout` and `stderr` piped. Two async tasks read each to completion, appending to a shared `Arc<Mutex<Vec<u8>>>` and writing line-buffered to the log file. The log file is the durable record; the in-memory buffer feeds the truncated excerpt.
 
@@ -227,7 +239,7 @@ xcode_build(
      - If still alive after 5s: `kill -KILL -<pgid>`, then `child.wait()` (must succeed).
      - Join reader tasks (the kills close the pipes → EOF → readers finish). Mark `status = TimedOut`, `exit_code = null`.
 
-5. **Clean up derived data.** `std::fs::remove_dir_all(derived_data_path)`. On error, log + continue — don't fail the build over cleanup. The `.xcresult` and `.log` stay (needed for `xcode_get_build_errors` and debugging).
+5. **No derived-data cleanup.** The server uses Xcode's default DerivedData location (shared with the IDE), so it never `rm -rf`s it — deleting the user's IDE build cache would force a full rebuild in Xcode. If stale state is suspected, callers use `action: "clean+build"`, which lets xcodebuild manage its own DerivedData lifecycle. The `.xcresult` and `.log` stay (needed for `xcode_get_build_errors` and debugging).
 
 6. **Register in the store.** Push `BuildRecord` into the ring buffer (§9). Best-effort: if the store is full, oldest evicted; its on-disk `.xcresult`/`.log` are **not** deleted (only the in-memory pointer is dropped — files remain queryable via direct path).
 
@@ -402,7 +414,7 @@ pub struct BuildRecord {
 
 - Always `tokio::process::Command::new("xcrun")` with explicit `.arg()` calls — never a shell string. `xcrun xcodebuild ...` so the active Xcode is used.
 - All flag values (`scheme`, `configuration`, `destination`, paths) come **only** from validated inputs — never echoed from raw user JSON.
-- Fixed mandatory flags set by the server: `-resultBundlePath <under result_dir>`, `-derivedDataPath <under result_dir>/DerivedData`, `-quiet` (suppress noise; diagnostics come from the xcresult, not stdout).
+- Fixed mandatory flags set by the server: `-resultBundlePath <under result_dir>`, `-quiet` (suppress noise; diagnostics come from the xcresult, not stdout). **No `-derivedDataPath`** — inherits Xcode's configured default so MCP builds reuse the IDE build cache.
 - Child run in its own process group via `setsid()` in `pre_exec` (§8). On timeout: SIGTERM the group, 5s grace, SIGKILL. Prevents orphaned `swiftc`/`ld`/`clang` children.
 
 ### Explicitly out of scope (defended against by design)
@@ -530,7 +542,7 @@ How we know each of the 15 requirements is met:
 ## 15. Open Questions / Future Work
 
 - **v2:** MCP progress notifications (parse `xcodebuild` `% done` lines) and cancellation (`notifications/cancelled`).
-- **v2:** concurrent builds (per-build `derivedDataPath` already isolates Xcode state).
+- **v2:** concurrent builds. The current design inherits Xcode's default DerivedData location (shared with the IDE), so concurrent builds on the same project would collide on `build.db`. v2 concurrency will require reintroducing a **server-managed** per-build `-derivedDataPath` (UUID-based, not user-supplied) gated behind a concurrency flag. Design deferred to v2.
 - **v2:** `xcodebuild test` / `archive` support (different failure modes, different result bundle schema).
 - **v2:** `xcode_list_destinations` tool wrapping `xcodebuild -showdestinations`.
 - **Possibly v1.1:** snapshot tests via `insta` if fixture assertion verbosity becomes a maintenance burden.

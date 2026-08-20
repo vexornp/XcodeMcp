@@ -21,7 +21,6 @@ pub fn build_list_schemes_command(project_or_workspace: &Path) -> Command {
     cmd
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_xcodebuild_command(
     project_or_workspace: &Path,
     scheme: &str,
@@ -29,7 +28,6 @@ pub fn build_xcodebuild_command(
     configuration: Option<&str>,
     destination: Option<&str>,
     xcresult_path: &Path,
-    derived_data_path: &Path,
 ) -> Command {
     let mut cmd = Command::new("xcrun");
     cmd.arg("xcodebuild").arg("-scheme").arg(scheme);
@@ -40,11 +38,11 @@ pub fn build_xcodebuild_command(
     if let Some(dest) = destination {
         cmd.arg("-destination").arg(dest);
     }
-    cmd.arg("-resultBundlePath")
-        .arg(xcresult_path)
-        .arg("-derivedDataPath")
-        .arg(derived_data_path)
-        .arg("-quiet");
+    // No `-derivedDataPath` — inherit Xcode's configured default (typically
+    // ~/Library/Developer/Xcode/DerivedData, or the user's custom location set
+    // in Xcode → Settings → Locations). This lets MCP builds reuse the IDE's
+    // build cache instead of starting from scratch each time.
+    cmd.arg("-resultBundlePath").arg(xcresult_path).arg("-quiet");
     match action {
         "clean+build" => {
             cmd.arg("clean").arg("build");
@@ -277,7 +275,6 @@ pub async fn run_build(
     // 2. Reserve build_id + paths
     let build_id = uuid::Uuid::new_v4().to_string();
     let xcresult_path = result_dir.join(format!("{build_id}.xcresult"));
-    let derived_data_path = result_dir.join("DerivedData").join(&build_id);
     let log_path = log_dir.join(format!("{build_id}.log"));
     std::fs::File::create(&log_path)?;
 
@@ -392,7 +389,6 @@ pub async fn run_build(
         configuration.as_deref(),
         destination.as_deref(),
         &xcresult_path,
-        &derived_data_path,
     );
 
     // 6. Run supervised
@@ -425,12 +421,9 @@ pub async fn run_build(
             None
         };
 
-    // 10. Clean up derived data
-    if derived_data_path.exists() {
-        if let Err(e) = std::fs::remove_dir_all(&derived_data_path) {
-            tracing::warn!("failed to clean derived data: {e}");
-        }
-    }
+    // 10. (No DerivedData cleanup — we use Xcode's default location, which is
+    //     shared with the IDE. Removing it would nuke the user's build cache.
+    //     If stale state is suspected, callers should use `action: "clean+build"`.)
 
     // 11. Determine build status
     let build_status = match status.as_str() {
