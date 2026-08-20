@@ -166,6 +166,34 @@ XCODE_MCP_LIVE_TESTS=1 cargo test --features xcode-mcp-core/live-xcode -- --test
 
 Live tests are double-gated: both the `live-xcode` feature flag AND the `XCODE_MCP_LIVE_TESTS=1` env var must be set. The test fixture (`MiniApp.xcodeproj`) is pre-generated and committed, so no external tools are needed.
 
+## Releasing
+
+Releases are automated via `.github/workflows/release.yml`, which fires on tag push (`v*`). It verifies the tag matches `Cargo.toml`, computes the tarball sha256, renders the Homebrew formula from `Formula/xcode-mcp.rb` (a template with `{{TAG}}` / `{{SHA256}}` placeholders), pushes the rendered formula to `vexornp/homebrew-xcode-mcp`, and creates the GitHub release.
+
+### One-time setup
+
+Create a fine-grained Personal Access Token with `Contents: write` on `vexornp/homebrew-xcode-mcp` (only):
+
+1. https://github.com/settings/personal-access-tokens/new
+2. Repository access → select `vexornp/homebrew-xcode-mcp`
+3. Permissions → Repository permissions → Contents: `Read and write`
+4. Generate, copy the token
+5. Add it as a repository secret named `TAP_REPO_TOKEN` at https://github.com/vexornp/XcodeMcp/settings/secrets/actions
+
+### Cutting a release
+
+```bash
+./scripts/bump-version.sh 0.2.0
+```
+
+This bumps `Cargo.toml`, refreshes `Cargo.lock` via `cargo check`, commits, tags `v0.2.0`, and pushes — which triggers the release workflow. Watch progress at https://github.com/vexornp/XcodeMcp/actions.
+
+When the workflow completes, users upgrade with:
+
+```bash
+brew update && brew upgrade xcode-mcp
+```
+
 ## Security Model
 
 - `XCODE_MCP_ROOT` is the single trust boundary. All project paths must canonicalize under it.
