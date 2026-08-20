@@ -8,7 +8,11 @@ use xcode_mcp_core::{
 };
 
 #[derive(Parser)]
-#[command(name = "xcode-mcp")]
+#[command(
+    name = "xcode-mcp",
+    version,
+    about = "MCP server that drives xcodebuild and parses build diagnostics"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
