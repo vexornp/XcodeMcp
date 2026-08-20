@@ -1,8 +1,9 @@
 use crate::diagnostic::load_diagnostics;
 use crate::error::{Error, Result};
+use crate::pod::{run_pod, PodParams};
 use crate::security::{
-    validate_action, validate_configuration, validate_destination, validate_project_or_workspace,
-    validate_scheme, validate_timeout,
+    validate_action, validate_configuration, validate_destination, validate_pod_action,
+    validate_pod_timeout, validate_project_or_workspace, validate_scheme, validate_timeout,
 };
 use crate::store::{BuildRecord, BuildStatus, BuildStore};
 use serde::{Deserialize, Serialize};
@@ -216,6 +217,8 @@ pub struct BuildParams {
     pub configuration: Option<String>,
     pub destination: Option<String>,
     pub timeout_secs: Option<u32>,
+    pub pod_action: Option<String>,
+    pub pod_timeout_secs: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -230,6 +233,18 @@ pub struct BuildOutput {
     pub error_count: u32,
     pub warning_count: u32,
     pub truncated_stderr_excerpt: Option<String>,
+    pub pod: Option<PodStepResult>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PodStepResult {
+    pub action: String,
+    pub status: String,
+    pub exit_code: Option<i32>,
+    pub duration_secs: f64,
+    pub log_path: String,
+    pub stderr_excerpt: Option<String>,
 }
 
 pub async fn run_build(
@@ -253,6 +268,11 @@ pub async fn run_build(
         None => None,
     };
     let timeout_secs = validate_timeout(params.timeout_secs)?;
+    let pod_action = match params.pod_action.as_deref() {
+        Some(a) => Some(validate_pod_action(a)?),
+        None => None,
+    };
+    let pod_timeout_secs = validate_pod_timeout(params.pod_timeout_secs)?;
 
     // 2. Reserve build_id + paths
     let build_id = uuid::Uuid::new_v4().to_string();
@@ -267,7 +287,104 @@ pub async fn run_build(
         .await
         .map_err(|e| crate::error::Error::Internal(format!("semaphore closed: {e}")))?;
 
-    // 4. Build command
+    // 4. Pod pre-step (if requested)
+    let pod_step: Option<PodStepResult> = if let Some(ref action) = pod_action {
+        let pod_params = PodParams {
+            project_or_workspace: params.project_or_workspace.clone(),
+            action: Some(action.clone()),
+            timeout_secs: Some(pod_timeout_secs),
+        };
+        match run_pod(pod_params, root, log_dir).await {
+            Ok(out) => {
+                let step = PodStepResult {
+                    action: out.action,
+                    status: out.status.clone(),
+                    exit_code: out.exit_code,
+                    duration_secs: out.duration_secs,
+                    log_path: out.log_path,
+                    stderr_excerpt: out.stderr_excerpt.clone(),
+                };
+                if out.status != "Succeeded" {
+                    let build_status = BuildStatus::PodFailed;
+                    store.push(BuildRecord {
+                        build_id: build_id.clone(),
+                        status: build_status.clone(),
+                        exit_code: step.exit_code,
+                        duration_secs: step.duration_secs,
+                        project_or_workspace: validated_path.clone(),
+                        scheme: scheme.clone(),
+                        xcresult_path: xcresult_path.clone(),
+                        log_path: log_path.clone(),
+                        result_bundle_written: false,
+                        error_count: 0,
+                        warning_count: 0,
+                        stderr_excerpt: step.stderr_excerpt.clone(),
+                        created_at: std::time::SystemTime::now(),
+                    });
+                    return Ok(BuildOutput {
+                        build_id,
+                        status: "PodFailed".to_string(),
+                        exit_code: step.exit_code,
+                        duration_secs: step.duration_secs,
+                        xcresult_path: xcresult_path.to_string_lossy().into_owned(),
+                        log_path: log_path.to_string_lossy().into_owned(),
+                        result_bundle_written: false,
+                        error_count: 0,
+                        warning_count: 0,
+                        truncated_stderr_excerpt: step.stderr_excerpt.clone(),
+                        pod: Some(step),
+                    });
+                }
+                Some(step)
+            }
+            Err(e) => {
+                let excerpt = Some(e.to_string());
+                let step = PodStepResult {
+                    action: action.clone(),
+                    status: "Failed".to_string(),
+                    exit_code: None,
+                    duration_secs: 0.0,
+                    log_path: log_dir
+                        .join(format!("{build_id}-pod.log"))
+                        .to_string_lossy()
+                        .into_owned(),
+                    stderr_excerpt: excerpt.clone(),
+                };
+                store.push(BuildRecord {
+                    build_id: build_id.clone(),
+                    status: BuildStatus::PodFailed,
+                    exit_code: None,
+                    duration_secs: 0.0,
+                    project_or_workspace: validated_path.clone(),
+                    scheme: scheme.clone(),
+                    xcresult_path: xcresult_path.clone(),
+                    log_path: log_path.clone(),
+                    result_bundle_written: false,
+                    error_count: 0,
+                    warning_count: 0,
+                    stderr_excerpt: excerpt.clone(),
+                    created_at: std::time::SystemTime::now(),
+                });
+                return Ok(BuildOutput {
+                    build_id,
+                    status: "PodFailed".to_string(),
+                    exit_code: None,
+                    duration_secs: 0.0,
+                    xcresult_path: xcresult_path.to_string_lossy().into_owned(),
+                    log_path: log_path.to_string_lossy().into_owned(),
+                    result_bundle_written: false,
+                    error_count: 0,
+                    warning_count: 0,
+                    truncated_stderr_excerpt: excerpt,
+                    pod: Some(step),
+                });
+            }
+        }
+    } else {
+        None
+    };
+
+    // 5. Build command
     let cmd = build_xcodebuild_command(
         &validated_path,
         &scheme,
@@ -278,15 +395,15 @@ pub async fn run_build(
         &derived_data_path,
     );
 
-    // 5. Run supervised
+    // 6. Run supervised
     let start = std::time::Instant::now();
     let result = run_supervised(cmd, timeout_secs, Some(&log_path)).await?;
     let duration = start.elapsed().as_secs_f64();
 
-    // 6. Check result bundle
+    // 7. Check result bundle
     let result_bundle_written = xcresult_path.exists();
 
-    // 7. Determine status
+    // 8. Determine status
     let (status, exit_code) = if result.timed_out {
         ("TimedOut".to_string(), None)
     } else if result.exit_code == Some(0) {
@@ -295,7 +412,7 @@ pub async fn run_build(
         ("Failed".to_string(), result.exit_code)
     };
 
-    // 8. Truncated stderr excerpt (last 2KB)
+    // 9. Truncated stderr excerpt (last 2KB)
     let truncated_stderr_excerpt =
         if (status == "Failed" || status == "TimedOut") && !result_bundle_written {
             let s = String::from_utf8_lossy(&result.stderr);
@@ -308,21 +425,21 @@ pub async fn run_build(
             None
         };
 
-    // 9. Clean up derived data
+    // 10. Clean up derived data
     if derived_data_path.exists() {
         if let Err(e) = std::fs::remove_dir_all(&derived_data_path) {
             tracing::warn!("failed to clean derived data: {e}");
         }
     }
 
-    // 10. Determine build status
+    // 11. Determine build status
     let build_status = match status.as_str() {
         "Succeeded" => BuildStatus::Succeeded,
         "TimedOut" => BuildStatus::TimedOut,
         _ => BuildStatus::Failed,
     };
 
-    // 11. Best-effort: compute error/warning counts (before storing so
+    // 12. Best-effort: compute error/warning counts (before storing so
     //     load_diagnostics uses the filesystem fallback, not a stale record)
     let (error_count, warning_count) = if result_bundle_written {
         match load_diagnostics(Some(&build_id), store, result_dir, log_dir).await {
@@ -336,7 +453,7 @@ pub async fn run_build(
         (0, 0)
     };
 
-    // 12. Register in store with computed counts
+    // 13. Register in store with computed counts
     store.push(BuildRecord {
         build_id: build_id.clone(),
         status: build_status.clone(),
@@ -364,5 +481,6 @@ pub async fn run_build(
         error_count,
         warning_count,
         truncated_stderr_excerpt,
+        pod: pod_step,
     })
 }

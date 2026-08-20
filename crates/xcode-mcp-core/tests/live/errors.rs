@@ -38,6 +38,8 @@ async fn get_build_errors_returns_xcresult_diagnostics() {
         configuration: Some("Debug".into()),
         destination: Some("generic/platform=iOS Simulator".into()),
         timeout_secs: Some(300),
+        pod_action: None,
+        pod_timeout_secs: None,
     };
     let build_output = run_build(params, &root, &result_dir, &log_dir, &store)
         .await

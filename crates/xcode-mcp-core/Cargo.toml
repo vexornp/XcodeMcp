@@ -30,3 +30,8 @@ required-features = ["live-xcode"]
 name = "errors"
 path = "tests/live/errors.rs"
 required-features = ["live-xcode"]
+
+[[test]]
+name = "pod"
+path = "tests/live/pod.rs"
+required-features = ["live-xcode"]

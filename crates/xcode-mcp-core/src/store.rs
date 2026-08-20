@@ -12,6 +12,7 @@ pub enum BuildStatus {
     TimedOut,
     Canceled,
     Unknown,
+    PodFailed,
 }
 
 #[derive(Debug, Clone)]

@@ -128,3 +128,27 @@ fn build_id_rejects_slashes() {
     assert!(validate_build_id("../../etc/passwd").is_err());
     assert!(validate_build_id("foo/bar").is_err());
 }
+
+#[test]
+fn pod_action_accepts_install_and_update() {
+    assert_eq!(validate_pod_action("install").unwrap(), "install");
+    assert_eq!(validate_pod_action("update").unwrap(), "update");
+}
+
+#[test]
+fn pod_action_rejects_others() {
+    assert!(validate_pod_action("outdated").is_err());
+    assert!(validate_pod_action("install --verbose").is_err());
+    assert!(validate_pod_action("").is_err());
+    assert!(validate_pod_action("INSTALL").is_err());
+    assert!(validate_pod_action("repo-update").is_err());
+}
+
+#[test]
+fn pod_timeout_defaults_and_validates() {
+    assert_eq!(validate_pod_timeout(None).unwrap(), 600);
+    assert_eq!(validate_pod_timeout(Some(60)).unwrap(), 60);
+    assert_eq!(validate_pod_timeout(Some(3600)).unwrap(), 3600);
+    assert!(validate_pod_timeout(Some(0)).is_err());
+    assert!(validate_pod_timeout(Some(3601)).is_err());
+}

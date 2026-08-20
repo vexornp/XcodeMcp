@@ -91,3 +91,22 @@ pub fn validate_build_id(id: &str) -> Result<String> {
     }
     Ok(id.to_string())
 }
+
+pub fn validate_pod_action(a: &str) -> Result<String> {
+    match a {
+        "install" | "update" => Ok(a.to_string()),
+        _ => Err(Error::InvalidArgument(format!(
+            "pod action must be install or update: {a:?}"
+        ))),
+    }
+}
+
+pub fn validate_pod_timeout(t: Option<u32>) -> Result<u32> {
+    match t {
+        None => Ok(600),
+        Some(v) if (1..=3600).contains(&v) => Ok(v),
+        Some(v) => Err(Error::InvalidArgument(format!(
+            "pod_timeout_secs must be 1..=3600: {v}"
+        ))),
+    }
+}

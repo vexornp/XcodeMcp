@@ -127,6 +127,11 @@ xcode-mcp debug build \
 
 # Get build errors (build_id from build output)
 xcode-mcp debug build-errors <build_id>
+
+# Pod install (refresh Pods.xcworkspace after Podfile edit)
+xcode-mcp debug pod \
+  --project /path/App.xcodeproj \
+  --action install
 ```
 
 ## Tools Reference
@@ -147,12 +152,26 @@ xcode-mcp debug build-errors <build_id>
 | `configuration` | `"Debug"` \| `"Release"` | no | If unset, xcodebuild picks |
 | `destination` | string | no | e.g. `generic/platform=iOS`, `platform=macOS` |
 | `timeout_secs` | integer | no | Default 1800, max 7200 |
+| `pod_action` | `"install"` \| `"update"` | no | When set, run pod first in the project's parent dir. On pod failure, the build is aborted with `status: "PodFailed"` and no xcodebuild runs. |
+| `pod_timeout_secs` | integer | no | Default 600, max 3600 (separate from `timeout_secs` because pod is network-bound) |
 
 ### `xcode_get_build_errors`
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `build_id` | string | no | Defaults to most recent build |
+
+### `xcode_pod`
+
+Runs `pod install` or `pod update` in the project's parent directory to refresh `Pods.xcworkspace` references before building. Use this when local CocoaPods files (Podfile, Podfile.lock) have changed.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `project_or_workspace` | string | yes | Path to `.xcodeproj` or `.xcworkspace` (parent dir must contain a `Podfile`) |
+| `action` | `"install"` \| `"update"` | yes | `install` respects `Podfile.lock`; `update` bumps pod versions |
+| `timeout_secs` | integer | no | Default 600, max 3600 |
+
+Returns a `PodOutput` with `run_id`, `status` (`Succeeded` / `Failed` / `TimedOut`), `exit_code`, `duration_secs`, `log_path`, and (on failure) `stderr_excerpt`.
 
 ## Testing
 
