@@ -55,6 +55,9 @@ pub fn build_xcodebuild_command(
             cmd.arg("build");
         }
     }
+    // Bypass code signing for the default build — this server only compiles
+    // to surface diagnostics, it never produces shippable artifacts.
+    cmd.arg("CODE_SIGNING_ALLOWED=NO");
     cmd
 }
 

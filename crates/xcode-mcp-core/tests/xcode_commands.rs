@@ -50,6 +50,7 @@ fn build_command_has_required_flags() {
     assert!(args.contains(&"-derivedDataPath".into()));
     assert!(args.contains(&"-quiet".into()));
     assert!(args.contains(&"build".into()));
+    assert!(args.contains(&"CODE_SIGNING_ALLOWED=NO".into()));
 }
 
 #[test]
