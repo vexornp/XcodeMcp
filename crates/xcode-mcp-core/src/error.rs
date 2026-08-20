@@ -32,6 +32,9 @@ pub enum Error {
     #[error("build not found: {0}")]
     BuildNotFound(String),
 
+    #[error("no Podfile found next to {working_dir}")]
+    PodfileNotFound { working_dir: PathBuf },
+
     #[error("no build available: {hint}")]
     NoBuildAvailable { hint: String },
 
