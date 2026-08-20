@@ -136,8 +136,8 @@ Live tests are double-gated: both the `live-xcode` feature flag AND the `XCODE_M
 
 Cargo workspace:
 - `xcode-mcp-core` (lib): all logic — security validation, scheme parsing, xcresult parsing, stderr parsing, diagnostic merging, process supervision, build store.
-- `xcode-mcp` (bin): JSON-RPC 2.0 over stdio MCP server + debug CLI.
+- `xcode-mcp` (bin): MCP server over stdio (using the `rmcp` crate) + debug CLI.
 
-The MCP server implements JSON-RPC 2.0 over stdio manually (the `rmcp` crate was unavailable in the build environment). It supports the standard MCP handshake (`initialize`, `tools/list`, `tools/call`, `ping`) and routes protocol errors (missing params, unknown tool) as JSON-RPC error responses, while tool execution failures use MCP's `isError` field.
+The MCP server uses the [`rmcp`](https://crates.io/crates/rmcp) crate (Rust MCP SDK) for spec-compliant JSON-RPC 2.0 over stdio. It implements `ServerHandler` with `initialize`, `tools/list`, and `tools/call`. Protocol errors (missing params, unknown tool) return JSON-RPC error responses (`-32602`), while tool execution failures use MCP's `isError` field so the caller sees the message.
 
 Diagnostic sourcing is hybrid: primary `xcresulttool get build-results` JSON (structured, with fix-its), fallback stderr regex parsing (for early-exit failures that never produce a result bundle).

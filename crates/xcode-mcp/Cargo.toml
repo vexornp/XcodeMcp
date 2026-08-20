@@ -13,7 +13,4 @@ serde_json.workspace = true
 clap.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-# rmcp 3.1.1 is NOT available on the temu crate mirror (404 from all repos).
-# crates.io and GitHub are also blocked by the proxy. The MCP server is
-# implemented manually using JSON-RPC 2.0 over stdio instead. If rmcp becomes
-# available later, server.rs can be migrated to use it.
+rmcp = { workspace = true, features = ["transport-io"] }
